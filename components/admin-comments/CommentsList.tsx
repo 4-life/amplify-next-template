@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { comment, comments } from '@/lib/api-fetch';
-import { Comment } from '@/database/dynamo';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -13,15 +11,29 @@ import {
   useToast,
 } from '@chakra-ui/react';
 import { DeleteIcon } from '@chakra-ui/icons';
+import type { Schema } from "@/amplify/data/resource";
+import { generateClient } from "aws-amplify/data";
+
+const client = generateClient<Schema>();
 
 interface Props {
-  preloadedList: Comment[];
+  preloadedList: Schema['Comment']['type'][];
 }
 
 export default function CommentsList({ preloadedList }: Props): JSX.Element {
   const toast = useToast();
   const [isLoading, setLoading] = useState<boolean>(false);
-  const [commentsList, setComments] = useState<Comment[]>(preloadedList);
+  const [commentsList, setComments] = useState<Schema['Comment']['type'][]>(preloadedList);
+
+  function listTodos() {
+    client.models.Comment.observeQuery().subscribe({
+      next: (data) => setComments([...data.items]),
+    });
+  }
+
+  useEffect(() => {
+    listTodos();
+  }, []);
 
   const onDelete = async (id?: string): Promise<void> => {
     if (!id) {
@@ -29,13 +41,9 @@ export default function CommentsList({ preloadedList }: Props): JSX.Element {
     }
 
     setLoading(true);
-    const result = await comment.delete(id);
+    const result = await client.models.Comment.delete({ id });
 
-    if (!result.error) {
-      const updatedPosts = await comments.get();
-
-      setComments(updatedPosts.data || []);
-
+    if (!result.errors?.length) {
       toast({
         title: 'Comment deleted',
         description: 'Comment has been deleted successfully',
@@ -45,7 +53,7 @@ export default function CommentsList({ preloadedList }: Props): JSX.Element {
     } else {
       toast({
         title: 'Failed',
-        description: `There was an error deletting comment: ${result.error}`,
+        description: `There was an error deletting comment: ${result.errors}`,
         status: 'error',
         duration: 5000,
       });
@@ -59,8 +67,8 @@ export default function CommentsList({ preloadedList }: Props): JSX.Element {
       {isLoading && <Progress size="xs" isIndeterminate />}
       <Stack direction={['column', 'row']} spacing={20} mb={4} flexWrap="wrap">
         {commentsList.map(
-          ({ commentId, name, email, comment: commentText }) => (
-            <Box key={commentId} w="fit-content">
+          ({ id, name, email, comment: commentText }) => (
+            <Box key={id} w="fit-content">
               <Heading as="h2" size="md">
                 {name}
               </Heading>
@@ -70,7 +78,7 @@ export default function CommentsList({ preloadedList }: Props): JSX.Element {
                 leftIcon={<DeleteIcon />}
                 colorScheme="pink"
                 variant="solid"
-                onClick={() => onDelete(commentId)}
+                onClick={() => onDelete(id)}
                 isDisabled={isLoading}
               >
                 Delete

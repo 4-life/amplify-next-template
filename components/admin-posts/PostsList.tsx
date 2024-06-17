@@ -2,21 +2,23 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { post, posts } from '@/lib/api-fetch';
-import { Post } from '@/database/dynamo';
 import { Box, Button, Progress, Stack, useToast } from '@chakra-ui/react';
 import { DeleteIcon } from '@chakra-ui/icons';
 import CreatePostForm from './CreatePostForm';
 import PostContent from '../blog/PostContent';
+import type { Schema } from "@/amplify/data/resource";
+import { generateClient } from "aws-amplify/data";
+
+const client = generateClient<Schema>();
 
 interface Props {
-  preloadedList: Post[];
+  preloadedList: Schema["Post"]["type"][];
 }
 
 export default function PostsList({ preloadedList }: Props): JSX.Element {
   const toast = useToast();
   const [isLoading, setLoading] = useState<boolean>(false);
-  const [postsList, setPosts] = useState<Post[]>(preloadedList);
+  const [postsList, setPosts] = useState<Schema["Post"]["type"][]>(preloadedList);
 
   const onDelete = async (id?: string): Promise<void> => {
     if (!id) {
@@ -24,10 +26,10 @@ export default function PostsList({ preloadedList }: Props): JSX.Element {
     }
 
     setLoading(true);
-    const result = await post.delete(id);
+    const result = await client.models.Post.delete({ id });
 
-    if (!result.error) {
-      const updatedPosts = await posts.get();
+    if (!result.errors?.length) {
+      const updatedPosts = await client.models.Post.list();
 
       setPosts(updatedPosts.data || []);
 
@@ -40,7 +42,7 @@ export default function PostsList({ preloadedList }: Props): JSX.Element {
     } else {
       toast({
         title: 'Failed',
-        description: `There was an error deletting post: ${result.error}`,
+        description: `There was an error deletting post: ${result.errors}`,
         status: 'error',
         duration: 5000,
       });
@@ -50,7 +52,7 @@ export default function PostsList({ preloadedList }: Props): JSX.Element {
   };
 
   const onUpdate = async (): Promise<void> => {
-    const updatedPosts = await posts.get();
+    const updatedPosts = await client.models.Post.list();
 
     setPosts(updatedPosts.data || []);
   };
@@ -59,20 +61,20 @@ export default function PostsList({ preloadedList }: Props): JSX.Element {
     <>
       {isLoading && <Progress size="xs" isIndeterminate />}
       <Stack direction={['column', 'row']} spacing={10} mb={4} flexWrap="wrap">
-        {postsList.map(({ postId, name, imageUrl, description }) => (
-          <Box key={postId} w="fit-content">
-            <Link href={`/blog/${postId}`}>
+        {postsList.map(({ id, name, imageUrl, description }) => (
+          <Box key={id} w="fit-content">
+            <Link href={`/blog/${id}`}>
               <PostContent
-                name={name}
-                imageUrl={imageUrl}
-                description={description}
+                name={name || ''}
+                imageUrl={imageUrl || ''}
+                description={description || ''}
               />
             </Link>
             <Button
               leftIcon={<DeleteIcon />}
               colorScheme="pink"
               variant="solid"
-              onClick={() => onDelete(postId)}
+              onClick={() => onDelete(id)}
               isDisabled={isLoading}
             >
               Delete

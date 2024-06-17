@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { posts } from '@/lib/api-fetch';
 import {
   Box,
   Button,
@@ -14,6 +13,10 @@ import {
   Textarea,
   useToast,
 } from '@chakra-ui/react';
+import type { Schema } from "@/amplify/data/resource";
+import { generateClient } from "aws-amplify/data";
+
+const client = generateClient<Schema>();
 
 interface Props {
   onUpdate: () => Promise<void>;
@@ -30,15 +33,14 @@ export default function CreatePostForm({ onUpdate }: Props): JSX.Element {
     e.preventDefault();
 
     setLoading(true);
-    const result = await posts.create({
+    const result = await client.models.Post.create({
       name,
       description,
       imageUrl: image,
-      price: 0,
     });
     setLoading(false);
 
-    if (result && !result.error) {
+    if (result && !result.errors?.length) {
       setName('');
       setDescription('');
       setImage('');
@@ -54,10 +56,10 @@ export default function CreatePostForm({ onUpdate }: Props): JSX.Element {
     }
 
     // If there was an error...
-    if (result && result.error) {
+    if (result && result.errors) {
       toast({
         title: 'Failed',
-        description: `There was an error submitting your post: ${result.error}`,
+        description: `There was an error submitting your post: ${result.errors}`,
         status: 'error',
         duration: 5000,
       });
