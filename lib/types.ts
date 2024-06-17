@@ -1,3 +1,3 @@
-xport interface ReactChildren {
+export interface ReactChildren {
   children: React.ReactNode
 }
