@@ -1,4 +1,4 @@
-import config from '@/lib/config';
+import config from '@/config';
 import { Box, Heading, Spacer, Stack } from '@chakra-ui/react';
 import Link from 'next/link';
 
